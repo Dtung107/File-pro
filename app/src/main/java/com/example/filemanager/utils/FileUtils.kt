@@ -38,6 +38,26 @@ object FileUtils {
         } else ""
     }
 
+    fun fileToFileItem(file: File): com.example.filemanager.model.FileItem {
+        val isDir = file.isDirectory
+        val ext = if (isDir) "" else getExtension(file.name)
+        val type = if (isDir) FileType.FOLDER else detectFileType(file)
+        val count = if (isDir) file.list()?.size ?: 0 else 0
+        return com.example.filemanager.model.FileItem(
+            name = file.name,
+            path = file.absolutePath,
+            size = if (isDir) 0L else file.length(),
+            lastModified = file.lastModified(),
+            isDirectory = isDir,
+            fileType = type,
+            mimeType = if (isDir) "resource/folder" else getMimeType(file.name),
+            extension = ext,
+            childCount = count,
+            isReadable = file.canRead(),
+            isWritable = file.canWrite()
+        )
+    }
+
     fun isLikelyTextFile(file: File): Boolean {
         if (!file.exists() || file.isDirectory || file.length() == 0L) return true
         return try {

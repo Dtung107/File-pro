@@ -31,6 +31,7 @@ sealed class ScreenDestination {
     data class HexViewer(val file: File) : ScreenDestination()
     data class ArchiveViewer(val file: File) : ScreenDestination()
     data class MediaViewer(val file: File, val type: FileType) : ScreenDestination()
+    data object DualPane : ScreenDestination()
 }
 
 enum class DualPaneSplit {

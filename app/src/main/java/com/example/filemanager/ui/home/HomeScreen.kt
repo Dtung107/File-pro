@@ -54,7 +54,8 @@ fun HomeScreen(
     onNavigateToFiles: (File) -> Unit,
     onNavigateToGameData: () -> Unit,
     onNavigateToAnalyzer: () -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToDualPane: () -> Unit = { viewModel.navigateTo(ScreenDestination.DualPane) }
 ) {
     val context = LocalContext.current
     val storageVolumes by viewModel.storageVolumes.collectAsState()
@@ -156,6 +157,9 @@ fun HomeScreen(
             },
             HomeCategory("File nén", Icons.Default.FolderZip, ElectricBlue) {
                 viewModel.loadCategoryFiles(FileType.ARCHIVE, "File nén")
+            },
+            HomeCategory("CHIA ĐÔI CỬA SỔ", Icons.Default.Splitscreen, CyanAccent) {
+                onNavigateToDualPane()
             }
         )
     }

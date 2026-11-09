@@ -51,6 +51,7 @@ import com.example.filemanager.utils.HashUtils
 import com.example.filemanager.utils.NetworkSharingManager
 import com.example.filemanager.viewmodel.DualPaneSplit
 import com.example.filemanager.viewmodel.MainViewModel
+import com.example.filemanager.viewmodel.ScreenDestination
 import com.example.ui.theme.*
 import kotlinx.coroutines.launch
 import java.io.File
@@ -277,11 +278,11 @@ fun FileExplorerScreen(
 
                 NavigationDrawerItem(
                     icon = { Icon(Icons.Default.Splitscreen, null, tint = ElectricBlue) },
-                    label = { Text(if (isDualPane) "Tắt chia đôi màn hình" else "Bật chia đôi màn hình (Dual Pane)", color = TextPrimary) },
-                    selected = isDualPane,
+                    label = { Text("Mở chia đôi màn hình (Dual Pane)", color = TextPrimary) },
+                    selected = false,
                     onClick = {
                         coroutineScope.launch { drawerState.close() }
-                        viewModel.toggleDualPane()
+                        viewModel.navigateTo(ScreenDestination.DualPane)
                     },
                     modifier = Modifier.padding(horizontal = 12.dp)
                 )

@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.filemanager.ui.analyzer.AnalyzerScreen
+import com.example.filemanager.ui.dualpane.DualPaneScreen
 import com.example.filemanager.ui.explorer.FileExplorerScreen
 import com.example.filemanager.ui.gamedata.GameDataScreen
 import com.example.filemanager.ui.home.HomeScreen
@@ -161,7 +162,8 @@ fun MainAppContainer(viewModel: MainViewModel) {
                         },
                         onNavigateToGameData = { viewModel.navigateTo(ScreenDestination.GameData) },
                         onNavigateToAnalyzer = { viewModel.navigateTo(ScreenDestination.Analyzer) },
-                        onNavigateToSettings = { viewModel.navigateTo(ScreenDestination.Settings) }
+                        onNavigateToSettings = { viewModel.navigateTo(ScreenDestination.Settings) },
+                        onNavigateToDualPane = { viewModel.navigateTo(ScreenDestination.DualPane) }
                     )
                 }
 
@@ -235,7 +237,10 @@ fun MainAppContainer(viewModel: MainViewModel) {
                 is ScreenDestination.ArchiveViewer -> {
                     ArchiveViewerScreen(
                         archiveFile = screen.file,
-                        onBack = { viewModel.navigateBack() }
+                        onBack = { viewModel.navigateBack() },
+                        onOpenApkInspector = { file -> viewModel.navigateTo(ScreenDestination.ApkInspector(file)) },
+                        onOpenSqliteViewer = { file -> viewModel.navigateTo(ScreenDestination.SqliteViewer(file)) },
+                        onOpenHexViewer = { file -> viewModel.navigateTo(ScreenDestination.HexViewer(file)) }
                     )
                 }
 
@@ -244,6 +249,14 @@ fun MainAppContainer(viewModel: MainViewModel) {
                         file = screen.file,
                         fileType = screen.type,
                         onBack = { viewModel.navigateBack() }
+                    )
+                }
+
+                is ScreenDestination.DualPane -> {
+                    DualPaneScreen(
+                        viewModel = viewModel,
+                        onBack = { viewModel.navigateBack() },
+                        onOpenFile = { fileItem -> viewModel.openFile(fileItem) }
                     )
                 }
             }

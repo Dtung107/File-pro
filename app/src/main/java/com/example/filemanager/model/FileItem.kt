@@ -34,6 +34,11 @@ data class SortOption(
     val order: SortOrder = SortOrder.ASCENDING
 )
 
+enum class ViewMode {
+    LIST,
+    GRID
+}
+
 data class FileItem(
     val name: String,
     val path: String,
@@ -49,6 +54,8 @@ data class FileItem(
     val isReadable: Boolean = true,
     val isWritable: Boolean = true
 ) {
+    val file: java.io.File
+        get() = java.io.File(path)
     val formattedSize: String
         get() = if (isDirectory) {
             if (childCount >= 0) "$childCount mục" else "Thư mục"

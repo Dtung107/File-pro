@@ -6,8 +6,10 @@ import androidx.compose.ui.graphics.Color
 val CharcoalBackground = Color(0xFF0F1117)
 val CharcoalSurface = Color(0xFF161A23)
 val CharcoalSurfaceVariant = Color(0xFF202634)
+val CharcoalCard = CharcoalSurfaceVariant
 val CharcoalSurfaceHighlight = Color(0xFF2C3446)
 val CharcoalDivider = Color(0xFF1F2430)
+val DocumentsUIDivider = Color(0xFF232733)
 
 val ElectricBlue = Color(0xFF2979FF)
 val ElectricBlueVariant = Color(0xFF1565C0)

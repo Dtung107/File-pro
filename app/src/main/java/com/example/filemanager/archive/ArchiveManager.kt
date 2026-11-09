@@ -221,6 +221,158 @@ object ArchiveManager {
         }
     }
 
+    suspend fun readEntryBytes(
+        archiveFile: File,
+        entryPath: String,
+        maxBytes: Int = 10 * 1024 * 1024 // 10MB limit for in-memory previews
+    ): Result<ByteArray> = withContext(Dispatchers.IO) {
+        try {
+            ZipFile(archiveFile).use { zip ->
+                val entry = zip.getEntry(entryPath)
+                    ?: return@withContext Result.failure(IllegalArgumentException("Không tìm thấy tệp: $entryPath"))
+
+                val streamSize = if (entry.size > 0 && entry.size <= maxBytes) entry.size.toInt() else maxBytes
+                BufferedInputStream(zip.getInputStream(entry), BUFFER_SIZE).use { bis ->
+                    val bytes = bis.readBytes()
+                    if (bytes.size > maxBytes) {
+                        Result.success(bytes.copyOf(maxBytes))
+                    } else {
+                        Result.success(bytes)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun extractDirectory(
+        archiveFile: File,
+        dirPrefix: String,
+        targetDir: File,
+        onProgress: ((progress: Float, currentEntry: String) -> Unit)? = null
+    ): Result<Int> = withContext(Dispatchers.IO) {
+        try {
+            if (!targetDir.exists()) targetDir.mkdirs()
+            val normalizedPrefix = if (dirPrefix.isEmpty() || dirPrefix.endsWith("/")) dirPrefix else "$dirPrefix/"
+
+            var extractedCount = 0
+            val zipFile = ZipFile(archiveFile)
+            val matchingEntries = mutableListOf<ZipEntry>()
+
+            zipFile.use { zip ->
+                val all = zip.entries()
+                while (all.hasMoreElements()) {
+                    val e = all.nextElement()
+                    if (e.name.startsWith(normalizedPrefix)) {
+                        matchingEntries.add(e)
+                    }
+                }
+
+                val total = matchingEntries.size.coerceAtLeast(1)
+                val buffer = ByteArray(BUFFER_SIZE)
+
+                matchingEntries.forEachIndexed { index, entry ->
+                    onProgress?.invoke(((index + 1).toFloat() / total.toFloat()).coerceIn(0f, 1f), entry.name)
+                    // Sub-path relative to dirPrefix
+                    val relPath = entry.name.removePrefix(normalizedPrefix)
+                    if (relPath.isEmpty()) return@forEachIndexed
+
+                    val outFile = File(targetDir, relPath)
+                    if (!outFile.canonicalPath.startsWith(targetDir.canonicalPath)) {
+                        return@forEachIndexed
+                    }
+
+                    if (entry.isDirectory) {
+                        outFile.mkdirs()
+                    } else {
+                        outFile.parentFile?.mkdirs()
+                        BufferedInputStream(zip.getInputStream(entry), BUFFER_SIZE).use { bis ->
+                            BufferedOutputStream(FileOutputStream(outFile), BUFFER_SIZE).use { bos ->
+                                var len: Int
+                                while (bis.read(buffer).also { len = it } != -1) {
+                                    bos.write(buffer, 0, len)
+                                }
+                            }
+                        }
+                        extractedCount++
+                    }
+                }
+            }
+
+            Result.success(extractedCount)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun extractEntryToTemp(
+        cacheDir: File,
+        archiveFile: File,
+        entryPath: String
+    ): Result<File> = withContext(Dispatchers.IO) {
+        try {
+            val tempDir = File(cacheDir, "zip_temp_viewers").apply { mkdirs() }
+            val fileName = entryPath.trimEnd('/').substringAfterLast('/')
+            val safeFile = File(tempDir, "${System.currentTimeMillis()}_$fileName")
+
+            ZipFile(archiveFile).use { zip ->
+                val entry = zip.getEntry(entryPath)
+                    ?: return@withContext Result.failure(IllegalArgumentException("Không tìm thấy tệp: $entryPath"))
+
+                BufferedInputStream(zip.getInputStream(entry), BUFFER_SIZE).use { bis ->
+                    BufferedOutputStream(FileOutputStream(safeFile), BUFFER_SIZE).use { bos ->
+                        val buffer = ByteArray(BUFFER_SIZE)
+                        var len: Int
+                        while (bis.read(buffer).also { len = it } != -1) {
+                            bos.write(buffer, 0, len)
+                        }
+                    }
+                }
+            }
+            Result.success(safeFile)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun extractNestedZip(
+        cacheDir: File,
+        archiveFile: File,
+        entryPath: String
+    ): Result<File> = withContext(Dispatchers.IO) {
+        try {
+            val nestedDir = File(cacheDir, "nested_zip_temp").apply { mkdirs() }
+            val fileName = entryPath.trimEnd('/').substringAfterLast('/')
+            val safeNestedFile = File(nestedDir, "${System.currentTimeMillis()}_$fileName")
+
+            ZipFile(archiveFile).use { zip ->
+                val entry = zip.getEntry(entryPath)
+                    ?: return@withContext Result.failure(IllegalArgumentException("Không tìm thấy tệp nén con: $entryPath"))
+
+                BufferedInputStream(zip.getInputStream(entry), BUFFER_SIZE).use { bis ->
+                    BufferedOutputStream(FileOutputStream(safeNestedFile), BUFFER_SIZE).use { bos ->
+                        val buffer = ByteArray(BUFFER_SIZE)
+                        var len: Int
+                        while (bis.read(buffer).also { len = it } != -1) {
+                            bos.write(buffer, 0, len)
+                        }
+                    }
+                }
+            }
+            Result.success(safeNestedFile)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    fun cleanTempFiles(cacheDir: File) {
+        try {
+            File(cacheDir, "zip_temp_viewers").deleteRecursively()
+            File(cacheDir, "nested_zip_temp").deleteRecursively()
+        } catch (_: Exception) {}
+    }
+
     suspend fun createZip(
         sourceFiles: List<File>,
         destinationZip: File,
