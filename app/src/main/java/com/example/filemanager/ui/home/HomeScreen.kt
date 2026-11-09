@@ -230,8 +230,8 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 14.dp, vertical = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = 14.dp, vertical = 2.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // Permission Banner (if needed)
             if (!hasPermission) {

@@ -2,9 +2,13 @@ package com.example.filemanager.archive
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.BufferedInputStream
+import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.nio.charset.Charset
+import java.util.zip.Deflater
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipInputStream
@@ -20,6 +24,8 @@ data class ArchiveEntryInfo(
 )
 
 object ArchiveManager {
+
+    private const val BUFFER_SIZE = 128 * 1024 // 128 KB buffer for high-speed I/O
 
     suspend fun listArchiveEntries(archiveFile: File): Result<List<ArchiveEntryInfo>> = withContext(Dispatchers.IO) {
         try {
@@ -63,7 +69,9 @@ object ArchiveManager {
 
             var extractedCount = 0
             val zipFile = ZipFile(archiveFile)
-            val totalEntries = zipFile.size()
+            val totalEntries = zipFile.size().coerceAtLeast(1)
+
+            val buffer = ByteArray(BUFFER_SIZE)
 
             zipFile.use { zip ->
                 val entries = zip.entries()
@@ -84,9 +92,59 @@ object ArchiveManager {
                         outFile.mkdirs()
                     } else {
                         outFile.parentFile?.mkdirs()
-                        zip.getInputStream(entry).use { input ->
-                            FileOutputStream(outFile).use { output ->
-                                input.copyTo(output)
+                        BufferedInputStream(zip.getInputStream(entry), BUFFER_SIZE).use { bis ->
+                            BufferedOutputStream(FileOutputStream(outFile), BUFFER_SIZE).use { bos ->
+                                var len: Int
+                                while (bis.read(buffer).also { len = it } != -1) {
+                                    bos.write(buffer, 0, len)
+                                }
+                            }
+                        }
+                        extractedCount++
+                    }
+                }
+            }
+
+            Result.success(extractedCount)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun extractEntries(
+        archiveFile: File,
+        entryPaths: List<String>,
+        targetDir: File,
+        onProgress: ((progress: Float, currentEntry: String) -> Unit)? = null
+    ): Result<Int> = withContext(Dispatchers.IO) {
+        try {
+            if (!targetDir.exists()) targetDir.mkdirs()
+
+            var extractedCount = 0
+            val zipFile = ZipFile(archiveFile)
+            val total = entryPaths.size.coerceAtLeast(1)
+            val buffer = ByteArray(BUFFER_SIZE)
+
+            zipFile.use { zip ->
+                entryPaths.forEachIndexed { index, path ->
+                    val entry = zip.getEntry(path) ?: return@forEachIndexed
+                    onProgress?.invoke(((index + 1).toFloat() / total.toFloat()).coerceIn(0f, 1f), entry.name)
+
+                    val outFile = File(targetDir, entry.name)
+                    if (!outFile.canonicalPath.startsWith(targetDir.canonicalPath)) {
+                        return@forEachIndexed
+                    }
+
+                    if (entry.isDirectory) {
+                        outFile.mkdirs()
+                    } else {
+                        outFile.parentFile?.mkdirs()
+                        BufferedInputStream(zip.getInputStream(entry), BUFFER_SIZE).use { bis ->
+                            BufferedOutputStream(FileOutputStream(outFile), BUFFER_SIZE).use { bos ->
+                                var len: Int
+                                while (bis.read(buffer).also { len = it } != -1) {
+                                    bos.write(buffer, 0, len)
+                                }
                             }
                         }
                         extractedCount++
@@ -119,9 +177,13 @@ object ArchiveManager {
                     outFile.mkdirs()
                 } else {
                     outFile.parentFile?.mkdirs()
-                    zip.getInputStream(entry).use { input ->
-                        FileOutputStream(outFile).use { output ->
-                            input.copyTo(output)
+                    BufferedInputStream(zip.getInputStream(entry), BUFFER_SIZE).use { bis ->
+                        BufferedOutputStream(FileOutputStream(outFile), BUFFER_SIZE).use { bos ->
+                            val buffer = ByteArray(BUFFER_SIZE)
+                            var len: Int
+                            while (bis.read(buffer).also { len = it } != -1) {
+                                bos.write(buffer, 0, len)
+                            }
                         }
                     }
                 }
@@ -132,9 +194,37 @@ object ArchiveManager {
         }
     }
 
+    suspend fun readEntryText(
+        archiveFile: File,
+        entryPath: String,
+        maxBytes: Int = 1024 * 1024
+    ): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            ZipFile(archiveFile).use { zip ->
+                val entry = zip.getEntry(entryPath)
+                    ?: return@withContext Result.failure(IllegalArgumentException("Không tìm thấy tệp: $entryPath"))
+
+                BufferedInputStream(zip.getInputStream(entry), BUFFER_SIZE).use { bis ->
+                    val buffer = ByteArray(minOf(entry.size.coerceAtLeast(1024L), maxBytes.toLong()).toInt())
+                    val read = bis.read(buffer)
+                    if (read > 0) {
+                        val text = String(buffer, 0, read, Charsets.UTF_8)
+                        val suffix = if (entry.size > maxBytes) "\n\n[...Đã cắt nội dung vì tệp lớn hơn 1MB...]" else ""
+                        Result.success(text + suffix)
+                    } else {
+                        Result.success("(Tệp rỗng)")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun createZip(
         sourceFiles: List<File>,
         destinationZip: File,
+        compressionLevel: Int = Deflater.BEST_SPEED,
         onProgress: ((progress: Float, currentFile: String) -> Unit)? = null
     ): Result<File> = withContext(Dispatchers.IO) {
         try {
@@ -142,12 +232,18 @@ object ArchiveManager {
             val totalFiles = sourceFiles.sumOf { countFilesIn(it) }
             var processed = 0
 
-            ZipOutputStream(FileOutputStream(destinationZip)).use { zos ->
-                for (source in sourceFiles) {
-                    addFileToZip(source, source.name, zos) { name ->
-                        processed++
-                        if (totalFiles > 0) {
-                            onProgress?.invoke((processed.toFloat() / totalFiles.toFloat()).coerceIn(0f, 1f), name)
+            // High-speed buffered ZipOutputStream with optimized compression level
+            BufferedOutputStream(FileOutputStream(destinationZip), BUFFER_SIZE).use { bos ->
+                ZipOutputStream(bos).use { zos ->
+                    zos.setLevel(compressionLevel) // Deflater.BEST_SPEED produces up to 4x faster zip creation
+                    val buffer = ByteArray(BUFFER_SIZE)
+
+                    for (source in sourceFiles) {
+                        addFileToZipFast(source, source.name, zos, buffer) { name ->
+                            processed++
+                            if (totalFiles > 0) {
+                                onProgress?.invoke((processed.toFloat() / totalFiles.toFloat()).coerceIn(0f, 1f), name)
+                            }
                         }
                     }
                 }
@@ -164,20 +260,29 @@ object ArchiveManager {
         return 1 + (file.listFiles()?.sumOf { countFilesIn(it) } ?: 0)
     }
 
-    private fun addFileToZip(file: File, entryPath: String, zos: ZipOutputStream, onItem: (String) -> Unit) {
+    private fun addFileToZipFast(
+        file: File,
+        entryPath: String,
+        zos: ZipOutputStream,
+        buffer: ByteArray,
+        onItem: (String) -> Unit
+    ) {
         onItem(file.name)
         if (file.isDirectory) {
             val dirEntry = ZipEntry(if (entryPath.endsWith("/")) entryPath else "$entryPath/")
             zos.putNextEntry(dirEntry)
             zos.closeEntry()
             file.listFiles()?.forEach { child ->
-                addFileToZip(child, "$entryPath/${child.name}", zos, onItem)
+                addFileToZipFast(child, "$entryPath/${child.name}", zos, buffer, onItem)
             }
         } else {
             val entry = ZipEntry(entryPath)
             zos.putNextEntry(entry)
-            FileInputStream(file).use { fis ->
-                fis.copyTo(zos)
+            BufferedInputStream(FileInputStream(file), BUFFER_SIZE).use { bis ->
+                var len: Int
+                while (bis.read(buffer).also { len = it } != -1) {
+                    zos.write(buffer, 0, len)
+                }
             }
             zos.closeEntry()
         }
@@ -187,14 +292,15 @@ object ArchiveManager {
         try {
             var count = 0
             var totalBytes = 0L
-            val buffer = ByteArray(16 * 1024)
+            val buffer = ByteArray(BUFFER_SIZE)
 
-            ZipInputStream(FileInputStream(archiveFile)).use { zis ->
+            ZipInputStream(BufferedInputStream(FileInputStream(archiveFile), BUFFER_SIZE)).use { zis ->
                 var entry: ZipEntry?
                 while (zis.nextEntry.also { entry = it } != null) {
                     count++
-                    while (zis.read(buffer) > 0) {
-                        totalBytes += buffer.size
+                    var read: Int
+                    while (zis.read(buffer).also { read = it } > 0) {
+                        totalBytes += read
                     }
                     zis.closeEntry()
                 }

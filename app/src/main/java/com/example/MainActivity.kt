@@ -6,13 +6,20 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.filemanager.ui.analyzer.AnalyzerScreen
 import com.example.filemanager.ui.explorer.FileExplorerScreen
 import com.example.filemanager.ui.gamedata.GameDataScreen
@@ -75,31 +82,64 @@ fun MainAppContainer(viewModel: MainViewModel) {
         modifier = Modifier.fillMaxSize(),
         bottomBar = {
             if (isTopLevelScreen) {
-                NavigationBar(
-                    containerColor = CharcoalSurface,
-                    contentColor = TextPrimary
+                Surface(
+                    color = CharcoalSurface,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .windowInsetsPadding(WindowInsets.navigationBars)
                 ) {
-                    bottomNavItems.forEach { item ->
-                        val isSelected = when (item.destination) {
-                            is ScreenDestination.Home -> currentScreen is ScreenDestination.Home
-                            is ScreenDestination.Files -> currentScreen is ScreenDestination.Files
-                            is ScreenDestination.Analyzer -> currentScreen is ScreenDestination.Analyzer
-                            else -> false
-                        }
+                    Column {
+                        HorizontalDivider(color = Color(0xFF232733), thickness = 0.8.dp)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            bottomNavItems.forEach { item ->
+                                val isSelected = when (item.destination) {
+                                    is ScreenDestination.Home -> currentScreen is ScreenDestination.Home
+                                    is ScreenDestination.Files -> currentScreen is ScreenDestination.Files
+                                    is ScreenDestination.Analyzer -> currentScreen is ScreenDestination.Analyzer
+                                    else -> false
+                                }
 
-                        NavigationBarItem(
-                            selected = isSelected,
-                            onClick = { viewModel.navigateTo(item.destination) },
-                            icon = { Icon(item.icon, contentDescription = item.title) },
-                            label = { Text(item.title, style = MaterialTheme.typography.labelSmall) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = ElectricBlue,
-                                selectedTextColor = ElectricBlue,
-                                indicatorColor = ElectricBlue.copy(alpha = 0.15f),
-                                unselectedIconColor = TextMuted,
-                                unselectedTextColor = TextMuted
-                            )
-                        )
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                        .clickable { viewModel.navigateTo(item.destination) },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        Surface(
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = if (isSelected) ElectricBlue.copy(alpha = 0.2f) else Color.Transparent,
+                                            modifier = Modifier.size(width = 44.dp, height = 24.dp)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(
+                                                    item.icon,
+                                                    contentDescription = item.title,
+                                                    tint = if (isSelected) ElectricBlue else TextMuted,
+                                                    modifier = Modifier.size(19.dp)
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = item.title,
+                                            fontSize = 10.5.sp,
+                                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                            color = if (isSelected) ElectricBlue else TextMuted
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

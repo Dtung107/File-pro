@@ -345,9 +345,9 @@ fun FileExplorerScreen(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 color = TextPrimary,
-                                style = MaterialTheme.typography.titleLarge,
+                                style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 20.sp
+                                fontSize = 17.sp
                             )
                         }
                     },
@@ -1176,36 +1176,40 @@ private fun CategoryFilterRow(
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(horizontal = 12.dp, vertical = 3.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         categories.forEach { (type, title, icon) ->
             Surface(
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(16.dp),
                 color = CharcoalSurface,
                 border = androidx.compose.foundation.BorderStroke(1.dp, ChipBorderColor),
                 modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
+                    .clip(RoundedCornerShape(16.dp))
                     .clickable { onSelectCategory(type, title) }
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = title,
-                        tint = CoralChipTint,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    if (type == FileType.ARCHIVE) {
+                        ZipDocumentBadgeIcon(modifier = Modifier.size(width = 16.dp, height = 20.dp))
+                    } else {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = title,
+                            tint = CoralChipTint,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = title,
                         color = TextPrimary,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
-                        fontSize = 13.sp
+                        fontSize = 12.sp
                     )
                 }
             }
@@ -1228,7 +1232,7 @@ private fun SubheaderRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp),
+            .padding(horizontal = 14.dp, vertical = 2.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1236,43 +1240,43 @@ private fun SubheaderRow(
             text = "Tệp trên $folderName",
             style = MaterialTheme.typography.bodyMedium,
             color = Color(0xFF9AA0A6),
-            fontSize = 14.sp
+            fontSize = 13.sp
         )
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(
                 onClick = onOpenNewWindow,
-                modifier = Modifier.size(36.dp)
+                modifier = Modifier.size(30.dp)
             ) {
                 Icon(
                     Icons.Default.Launch,
                     contentDescription = "Mở cửa sổ mới",
                     tint = CyanAccent,
-                    modifier = Modifier.size(19.dp)
+                    modifier = Modifier.size(17.dp)
                 )
             }
 
             IconButton(
                 onClick = onOpenSort,
-                modifier = Modifier.size(36.dp)
+                modifier = Modifier.size(30.dp)
             ) {
                 Icon(
                     Icons.AutoMirrored.Filled.Sort,
                     contentDescription = "Sắp xếp",
                     tint = Color(0xFF9AA0A6),
-                    modifier = Modifier.size(19.dp)
+                    modifier = Modifier.size(17.dp)
                 )
             }
 
             IconButton(
                 onClick = onToggleView,
-                modifier = Modifier.size(36.dp)
+                modifier = Modifier.size(30.dp)
             ) {
                 Icon(
                     if (isGridView) Icons.Default.ViewList else Icons.Default.GridView,
                     contentDescription = if (isGridView) "Dạng danh sách" else "Dạng lưới",
                     tint = Color(0xFF9AA0A6),
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }
@@ -1474,7 +1478,7 @@ private fun DocumentsUIListItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 13.dp),
+                .padding(horizontal = 14.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Left Icon (Grey folder in screenshot, or distinctive file icon)
@@ -1586,11 +1590,11 @@ private fun DocumentsUIListItem(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 66.dp)
+                .padding(start = 58.dp)
         ) {
             HorizontalDivider(
                 color = DocumentsUIDivider,
-                thickness = 0.8.dp
+                thickness = 0.6.dp
             )
         }
     }
@@ -1648,6 +1652,54 @@ private fun GridFileCard(
 }
 
 /**
+ * Custom ZIP document badge icon: Document sheet outline (📄) with bold "ZIP" text inside
+ */
+@Composable
+fun ZipDocumentBadgeIcon(modifier: Modifier = Modifier) {
+    Surface(
+        shape = RoundedCornerShape(topStart = 3.dp, topEnd = 7.dp, bottomStart = 3.dp, bottomEnd = 3.dp),
+        color = Color(0xFF1B2230),
+        border = androidx.compose.foundation.BorderStroke(1.2.dp, Color(0xFF4D88FF)),
+        modifier = modifier
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier.padding(horizontal = 1.dp, vertical = 1.dp)
+            ) {
+                // Mini decorative zipper teeth
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(1.dp),
+                    modifier = Modifier.padding(bottom = 1.5.dp)
+                ) {
+                    Box(modifier = Modifier.size(width = 2.5.dp, height = 1.5.dp).background(Color(0xFFFFA000)))
+                    Box(modifier = Modifier.size(width = 2.5.dp, height = 1.5.dp).background(Color(0xFF4D88FF)))
+                    Box(modifier = Modifier.size(width = 2.5.dp, height = 1.5.dp).background(Color(0xFFFFA000)))
+                }
+                // Bold "ZIP" text badge inside the document sheet
+                Surface(
+                    shape = RoundedCornerShape(2.dp),
+                    color = Color(0xFF4D88FF)
+                ) {
+                    Text(
+                        text = "ZIP",
+                        color = Color.White,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 8.sp,
+                        letterSpacing = 0.3.sp,
+                        modifier = Modifier.padding(horizontal = 2.dp, vertical = 0.5.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
  * File icon mapper supporting folders and technical files: .ts, .txs, .css, .bat, .dat, etc.
  */
 @Composable
@@ -1676,6 +1728,11 @@ fun FileIcon(item: FileItem, isSelected: Boolean, modifier: Modifier = Modifier)
     }
 
     val ext = item.extension.lowercase()
+    if (item.fileType == FileType.ARCHIVE || ext in setOf("zip", "rar", "7z", "tar", "gz", "xz", "bz2")) {
+        ZipDocumentBadgeIcon(modifier = modifier)
+        return
+    }
+
     val (icon, color) = when {
         // Code / Technical scripts (.ts, .txs, .css, .bat, .js, .py, .kt, .json, .xml)
         ext in setOf("ts", "tsx", "js", "jsx", "txs", "css", "bat", "cmd", "sh", "py", "kt", "kts", "java", "c", "cpp", "h", "cs", "php", "sql", "vbs", "ps1", "json", "xml", "html") -> {
@@ -1692,10 +1749,6 @@ fun FileIcon(item: FileItem, isSelected: Boolean, modifier: Modifier = Modifier)
         // APK
         item.fileType == FileType.APK || ext in setOf("apk", "xapk", "apks") -> {
             Icons.Default.Android to ColorSuccessGreen
-        }
-        // Archives (.zip, .rar, .7z, .tar, .gz)
-        item.fileType == FileType.ARCHIVE || ext in setOf("zip", "rar", "7z", "tar", "gz", "xz") -> {
-            Icons.Default.FolderZip to ElectricBlue
         }
         // Media
         item.fileType == FileType.IMAGE -> Icons.Default.Image to Color(0xFFF48FB1)
