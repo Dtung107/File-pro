@@ -1,6 +1,0 @@
-{
-  "name": "File Manager Pro",
-  "description": "Advanced Android file manager, technical data inspector, APK analyzer, SQLite database viewer, Hex editor, and game data explorer.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
