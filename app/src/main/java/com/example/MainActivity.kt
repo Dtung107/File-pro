@@ -58,15 +58,10 @@ fun MainAppContainer(viewModel: MainViewModel) {
     val currentScreen by viewModel.currentScreen.collectAsState()
     val currentDir by viewModel.currentDirectory.collectAsState()
 
-    // Handle back button smoothly (retraces folder stack in Files before returning to Home)
-    BackHandler(enabled = currentScreen !is ScreenDestination.Home) {
+    BackHandler(enabled = viewModel.canNavigateBack()) {
         viewModel.navigateBack()
     }
 
-    // 3 main bottom nav items per user requirement:
-    // 1. Trang chủ (Home)
-    // 2. Tệp (Files)
-    // 3. Công cụ (Tools)
     val bottomNavItems = remember {
         listOf(
             BottomNavItem("Trang chủ", ScreenDestination.Home, Icons.Default.Home),
@@ -75,14 +70,15 @@ fun MainAppContainer(viewModel: MainViewModel) {
         )
     }
 
-    val isTopLevelScreen = currentScreen is ScreenDestination.Home ||
-            currentScreen is ScreenDestination.Files ||
-            currentScreen is ScreenDestination.Analyzer
+    // Bottom navigation is shown ONLY on Home and Analyzer screens
+    // Per user requirement: In the Files tab, bottom bar is removed to maximize screen area for files!
+    val showBottomBar = (currentScreen is ScreenDestination.Home || currentScreen is ScreenDestination.Analyzer) && currentScreen !is ScreenDestination.Files
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
-            if (isTopLevelScreen) {
+            if (showBottomBar) {
                 Surface(
                     color = CharcoalSurface,
                     modifier = Modifier
@@ -150,7 +146,7 @@ fun MainAppContainer(viewModel: MainViewModel) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(bottom = innerPadding.calculateBottomPadding())
         ) {
             when (val screen = currentScreen) {
                 is ScreenDestination.Home -> {

@@ -43,7 +43,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val prefs = application.getSharedPreferences("file_manager_pro_prefs", Context.MODE_PRIVATE)
 
-    private val _currentScreen = MutableStateFlow<ScreenDestination>(ScreenDestination.Home)
+    private val _currentScreen = MutableStateFlow<ScreenDestination>(ScreenDestination.Files)
     val currentScreen: StateFlow<ScreenDestination> = _currentScreen.asStateFlow()
 
     private val _navigationHistory = mutableListOf<ScreenDestination>()
@@ -167,10 +167,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
 
-            // If inside a Category list (e.g. Images, APK, etc.), return to Home
+            // If inside a Category list (e.g. Images, APK, etc.), return to normal folder view
             if (_activeCategoryTitle.value != null) {
                 _activeCategoryTitle.value = null
-                _currentScreen.value = ScreenDestination.Home
+                loadDirectory(_currentDirectory.value)
                 return true
             }
 
@@ -189,9 +189,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 return true
             }
 
-            // Only when at root of storage, return to Home screen
-            _currentScreen.value = ScreenDestination.Home
-            return true
+            // At root of storage: pop navigation history if user navigated here from another screen
+            if (_navigationHistory.isNotEmpty()) {
+                _currentScreen.value = _navigationHistory.removeAt(_navigationHistory.size - 1)
+                return true
+            }
+            return false
         }
 
         // For sub-screens (TextViewer, ApkInspector, HexViewer, Settings, etc.):
@@ -206,6 +209,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         return false
+    }
+
+    fun canNavigateBack(): Boolean {
+        if (_currentScreen.value is ScreenDestination.Files) {
+            if (_searchQuery.value.isNotBlank()) return true
+            if (_isMultiSelectMode.value) return true
+            if (_activeCategoryTitle.value != null) return true
+            if (_directoryBackStack.isNotEmpty()) return true
+            val parent = _currentDirectory.value.parentFile
+            val internalRoot = Environment.getExternalStorageDirectory()
+            if (parent != null && parent.canRead() && _currentDirectory.value.absolutePath != internalRoot.absolutePath) return true
+            return _navigationHistory.isNotEmpty()
+        }
+        return _currentScreen.value !is ScreenDestination.Home
     }
 
     fun refreshStorageVolumes() {

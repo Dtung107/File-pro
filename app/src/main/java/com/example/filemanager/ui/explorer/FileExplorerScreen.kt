@@ -129,6 +129,7 @@ fun FileExplorerScreen(
     var dragSourcePane by remember { mutableIntStateOf(0) }
     var dragOffset by remember { mutableStateOf(IntOffset.Zero) }
     var showTransferConfirmDialog by remember { mutableStateOf<Pair<FileItem, File>?>(null) }
+    var isFabExpanded by remember { mutableStateOf(false) }
 
     val safLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
@@ -212,6 +213,30 @@ fun FileExplorerScreen(
                         )
                     }
                 }
+
+                HorizontalDivider(color = DocumentsUIDivider, modifier = Modifier.padding(vertical = 8.dp))
+
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.Home, null, tint = ElectricBlue) },
+                    label = { Text("Trang chủ tổng quan", color = TextPrimary) },
+                    selected = false,
+                    onClick = {
+                        coroutineScope.launch { drawerState.close() }
+                        viewModel.navigateTo(ScreenDestination.Home)
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.Build, null, tint = CyanAccent) },
+                    label = { Text("Công cụ phân tích bộ nhớ", color = TextPrimary) },
+                    selected = false,
+                    onClick = {
+                        coroutineScope.launch { drawerState.close() }
+                        viewModel.navigateTo(ScreenDestination.Analyzer)
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
 
                 HorizontalDivider(color = DocumentsUIDivider, modifier = Modifier.padding(vertical = 8.dp))
 
@@ -305,6 +330,7 @@ fun FileExplorerScreen(
             snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
                 TopAppBar(
+                    windowInsets = WindowInsets.statusBars,
                     navigationIcon = {
                         if (isMultiSelect) {
                             IconButton(onClick = { viewModel.clearSelection() }) {
@@ -314,7 +340,7 @@ fun FileExplorerScreen(
                             IconButton(onClick = {
                                 coroutineScope.launch { drawerState.open() }
                             }) {
-                                Icon(Icons.Default.Menu, contentDescription = "Menu danh mục", tint = TextPrimary)
+                                Icon(Icons.Default.Menu, contentDescription = "Menu ngăn kéo", tint = TextPrimary)
                             }
                         }
                     },
@@ -342,15 +368,29 @@ fun FileExplorerScreen(
                                 fontWeight = FontWeight.Bold
                             )
                         } else {
-                            Text(
-                                text = activeCategoryTitle ?: primaryDisplayName,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                color = TextPrimary,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 17.sp
-                            )
+                            Column(
+                                modifier = Modifier.clickable {
+                                    coroutineScope.launch { drawerState.open() }
+                                }
+                            ) {
+                                val currentTitle = activeCategoryTitle ?: if (currentDir.absolutePath == android.os.Environment.getExternalStorageDirectory().absolutePath) primaryDisplayName else currentDir.name
+                                Text(
+                                    text = currentTitle,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = TextPrimary,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 16.sp
+                                )
+                                Text(
+                                    text = if (activeCategoryTitle != null) "Bộ lọc danh mục" else currentDir.absolutePath,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = CyanAccent,
+                                    fontSize = 11.sp
+                                )
+                            }
                         }
                     },
                     actions = {
@@ -376,10 +416,27 @@ fun FileExplorerScreen(
                                 Icon(Icons.Default.Share, contentDescription = "Chia sẻ", tint = TextPrimary)
                             }
                         } else {
+                            // Search toggle
                             IconButton(onClick = { isSearching = !isSearching }) {
                                 Icon(
                                     if (isSearching) Icons.Default.Close else Icons.Default.Search,
                                     contentDescription = "Tìm kiếm",
+                                    tint = TextPrimary
+                                )
+                            }
+                            // Direct View Mode toggle (Grid / List) in TopBar like ZArchiver
+                            IconButton(onClick = { viewModel.toggleViewMode() }) {
+                                Icon(
+                                    if (isGridView) Icons.Default.ViewList else Icons.Default.GridView,
+                                    contentDescription = if (isGridView) "Chuyển sang dạng Danh sách" else "Chuyển sang dạng Lưới",
+                                    tint = TextPrimary
+                                )
+                            }
+                            // Direct Sort button in TopBar like ZArchiver
+                            IconButton(onClick = { showSortDialog = true }) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.Sort,
+                                    contentDescription = "Sắp xếp",
                                     tint = TextPrimary
                                 )
                             }
@@ -440,11 +497,11 @@ fun FileExplorerScreen(
                                         }
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("Sắp xếp theo...", color = TextPrimary) },
-                                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.Sort, null, tint = TextPrimary) },
+                                        text = { Text("Tạo tệp nén ZIP", color = CyanAccent) },
+                                        leadingIcon = { Icon(Icons.Default.FolderZip, null, tint = CyanAccent) },
                                         onClick = {
                                             showMoreMenu = false
-                                            showSortDialog = true
+                                            showZipDialog = true
                                         }
                                     )
                                     DropdownMenuItem(
@@ -478,7 +535,77 @@ fun FileExplorerScreen(
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = DocumentsUIDarkBg)
                 )
             },
-            containerColor = DocumentsUIDarkBg
+            floatingActionButton = {
+                if (!isMultiSelect) {
+                    Column(
+                        horizontalAlignment = Alignment.End,
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        AnimatedVisibility(
+                            visible = isFabExpanded,
+                            enter = fadeIn() + expandVertically(),
+                            exit = fadeOut() + shrinkVertically()
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.End,
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                SmallFloatingActionButton(
+                                    onClick = {
+                                        isFabExpanded = false
+                                        createInSecondaryPane = false
+                                        newFolderName = ""
+                                        showCreateFolderDialog = true
+                                    },
+                                    containerColor = Color(0xFFFFB300),
+                                    contentColor = Color.Black
+                                ) {
+                                    Icon(Icons.Default.CreateNewFolder, contentDescription = "Thư mục mới")
+                                }
+
+                                SmallFloatingActionButton(
+                                    onClick = {
+                                        isFabExpanded = false
+                                        createInSecondaryPane = false
+                                        newFileName = ""
+                                        showCreateFileDialog = true
+                                    },
+                                    containerColor = ElectricBlue,
+                                    contentColor = Color.White
+                                ) {
+                                    Icon(Icons.Default.NoteAdd, contentDescription = "Tệp mới")
+                                }
+
+                                SmallFloatingActionButton(
+                                    onClick = {
+                                        isFabExpanded = false
+                                        showZipDialog = true
+                                    },
+                                    containerColor = CyanAccent,
+                                    contentColor = Color.Black
+                                ) {
+                                    Icon(Icons.Default.FolderZip, contentDescription = "Nén ZIP")
+                                }
+                            }
+                        }
+
+                        FloatingActionButton(
+                            onClick = { isFabExpanded = !isFabExpanded },
+                            containerColor = if (isFabExpanded) CharcoalSurfaceHighlight else ElectricBlue,
+                            contentColor = Color.White,
+                            shape = CircleShape
+                        ) {
+                            Icon(
+                                if (isFabExpanded) Icons.Default.Close else Icons.Default.Add,
+                                contentDescription = "Thao tác tạo mới",
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                }
+            },
+            containerColor = DocumentsUIDarkBg,
+            contentWindowInsets = WindowInsets.navigationBars
         ) { paddingValues ->
             Column(
                 modifier = Modifier
@@ -494,26 +621,45 @@ fun FileExplorerScreen(
                     )
                 }
 
-                // 1. Horizontal Category Filter Chips Row (Matches DocumentsUI screenshot)
+                // Horizontal Category Filter Chips Row (drawn close to status bar)
                 if (activeCategoryTitle == null && !isDualPane) {
                     CategoryFilterRow(
                         onSelectCategory = { type, title ->
                             viewModel.loadCategoryFiles(type, title)
                         }
                     )
+                } else if (activeCategoryTitle != null) {
+                    // Active category filter banner
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(CharcoalSurfaceVariant)
+                            .padding(horizontal = 14.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.FilterList, contentDescription = null, tint = ElectricBlue, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Đang lọc: $activeCategoryTitle (${displayedItems.size} mục)",
+                                color = TextPrimary,
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                viewModel.loadDirectory(currentDir)
+                            },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = "Xóa lọc", tint = TextMuted, modifier = Modifier.size(16.dp))
+                        }
+                    }
                 }
 
-                // 2. Subheader row: "Tệp trên MNA-AL00" + View Mode / Sort Toggles
-                SubheaderRow(
-                    folderName = if (activeCategoryTitle != null) activeCategoryTitle!! else primaryDisplayName,
-                    itemCount = displayedItems.size,
-                    isGridView = isGridView,
-                    onToggleView = { viewModel.toggleViewMode() },
-                    onOpenSort = { showSortDialog = true },
-                    onOpenNewWindow = { openNewAppWindow(context) }
-                )
-
-                // 3. Breadcrumb Path Bar (if in subfolder)
+                // Breadcrumb Path Bar (if in subfolder)
                 if (activeCategoryTitle == null) {
                     PathBreadcrumbsBar(
                         currentDir = currentDir,
